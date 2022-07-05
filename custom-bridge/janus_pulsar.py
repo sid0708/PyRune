@@ -19,25 +19,21 @@ client = pulsar.Client('pulsar://pulsar-broker.petuum-system:6650')
 producer = client.create_producer('topic1')
 
 
-
 def on_message(client, userdata, message):
     msg_payload = str(message.payload)
-    new_dict = {}
-    print('Received MQTT message', msg_payload)
+    print("The message payload is", msg_payload)
     # Cast byte string to string
     z = json.loads(msg_payload)
-    try:
-        if z.get("values")is not None:
-            new_dict = [dict([a, str(x)] for a, x in b.items()) for b in z["values"]]
-        else:
-            print("No Payload")
-    except IndexError as e:
-        print(f"Exception occured in payload {e}")
+    print("we are here")
+    if z.get("values")is not None:
+        new_dict = [dict([a, str(x)] for a, x in b.items()) for b in z["values"]]
+    else:
+        new_dict = []
     #cast the values to  str
-    current_timestamp =curr_timestamp = int(datetime.now().timestamp() * 1000)
-    msg_payload = {{"timestamp": current_timestamp, "values": new_dict}}
-    producer.send(msg_payload.encode())
-    print('Pulsar: Just published '+ str(msg_payload) + 'to topic topic1 ')
+    curr_timestamp = int(datetime.now().timestamp() * 1000)
+    payload = {"timestamp": curr_timestamp, "values": new_dict}
+    producer.send(payload.encode())
+    print('Pulsar: Just published '+ str(payload) + 'to topic topic1 ')
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
