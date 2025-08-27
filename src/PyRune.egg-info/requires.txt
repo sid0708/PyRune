@@ -1,0 +1,8 @@
+pyyaml
+psutil
+nvidia-ml-py3
+pyroute2
+loguru
+click
+python-dotenv
+pytest

@@ -1,0 +1,20 @@
+# Runtime and container interaction, based on the OS and distribution comment
+#docker          # For Docker API interaction if needed
+pyyaml          # For parsing YAML config files
+
+# Resource management
+psutil          # CPU, memory, disk monitoring
+# nvidia-ml-py3   # GPU monitoring via NVIDIA Management Library
+#numa            # For NUMA-aware scheduling (Linux)
+
+# Networking
+pyroute2        # For network namespace and virtual network management
+
+# Utilities
+loguru          # Logging
+click           # CLI interface for commands
+python-dotenv   # Loading environment variables
+
+# Testing
+pytest          # Unit and integration testing
+
