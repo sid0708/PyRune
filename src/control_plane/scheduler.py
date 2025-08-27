@@ -55,46 +55,66 @@ class Node:
             self.numa_topology[preferred_numa] += cpus
         self.available_cpus += cpus
 
+
 class Scheduler:
-    """
-    Enhanced scheduler: GPU-aware + NUMA-aware
-    """
-
     def __init__(self, nodes):
-        self.nodes = nodes  # List[Node]
+        self.nodes = nodes
 
-    def schedule_job(self, job_request):
+    def schedule(self, job_func, *args, **kwargs):
         """
-        Schedule a job with resource preferences:
-        job_request: dict with keys 'cpus', 'mem', 'gpus', 'preferred_numa' (optional)
+        Schedule a job defined with @pyrune_job decorator.
         """
-        # Sort nodes by available GPUs first (GPU-aware)
+        if not hasattr(job_func, "_pyrune_meta"):
+            raise ValueError("Function must be decorated with @pyrune_job")
+
+        job_request = job_func._pyrune_meta
         sorted_nodes = sorted(self.nodes, key=lambda n: n.available_gpus, reverse=True)
 
         for node in sorted_nodes:
             numa = job_request.get("preferred_numa")
             if node.can_allocate(job_request["cpus"], job_request["mem"], job_request["gpus"], numa):
                 node.allocate(job_request["cpus"], job_request["mem"], job_request["gpus"], numa)
-                log_info(f"Scheduled job on {node.name} (NUMA: {numa})")
-                return node.name
+                log_info(f"Scheduled job {job_func.__name__} on {node.name} (NUMA: {numa})")
+
+                # Execute the function
+                try:
+                    result = job_request["func"](*args, **kwargs)
+                    log_info(f"Job {job_func.__name__} completed on {node.name} with result={result}")
+                    return node.name, result
+                except Exception as e:
+                    log_error(f"Execution error on {node.name}: {e}")
+                    return node.name, None
+
         log_error("No available node found for job")
-        return None
+        return None, None
 
 
 # Example Usage
 if __name__ == "__main__":
-    # # Two nodes, each with 2 GPUs, 16 cores, 64GB RAM, and simple NUMA split
-    # nodes = [
-    #     Node("node1", total_cpus=16, total_mem=64, total_gpus=2, numa_topology={0: 8, 1: 8}),
-    #     Node("node2", total_cpus=32, total_mem=128, total_gpus=4, numa_topology={0: 16, 1: 16})
-    # ]
-    # scheduler = Scheduler(nodes)
-    #
-    # job1 = {"cpus": 4, "mem": 8, "gpus": 1, "preferred_numa": 0}
-    # job2 = {"cpus": 16, "mem": 32, "gpus": 2}  # No NUMA preference
-    #
-    # assigned_node1 = scheduler.schedule_job(job1)
-    # assigned_node2 = scheduler.schedule_job(job2)
-    #
-    # print(f"Job1 assigned to: {assigned_node1}")
-    # print(f"Job2 assigned to: {assigned_node2}")
+
+    nodes = [
+        Node("node1"),
+        Node("node2"),
+        Node("node3"),
+    ]
+
+    scheduler = Scheduler(nodes)
+
+
+    @pyrune_job(cpus=2, mem=4, gpus=1)
+    def train_model(data, epochs):
+        return f"Training model on {len(data)} samples for {epochs} epochs"
+
+    @pyrune_job(cpus=1, mem=2)
+    def preprocess_data(texts):
+        return [t.lower() for t in texts]
+
+    # Run jobs through scheduler
+    jobs = [
+        (preprocess_data, ["HELLO", "WORLD"]),
+        (train_model, ["sample1", "sample2"], {"epochs": 10}),
+    ]
+
+    for func, args, kwargs in [(f, a, kw if isinstance(kw, dict) else {}) for f, a, *kw in jobs]:
+        node, result = scheduler.schedule(func, *args, **kwargs)
+        print(f"Job {func.__name__} ran on {node} → {result}")
